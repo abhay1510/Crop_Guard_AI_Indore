@@ -4,6 +4,7 @@ const scanSchema = new mongoose.Schema(
   {
     fieldId: { type: mongoose.Schema.Types.ObjectId, ref: 'Field', required: true, index: true },
     ownerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    analysisVersion: { type: Number, default: 0 },
     imageUrl: { type: String },
     zoneId: { type: String, required: true }, // e.g. "B4"
     // Optional real GPS (GeoJSON, [lng, lat]). Left unset in the grid-only MVP.

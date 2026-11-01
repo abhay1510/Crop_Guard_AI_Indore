@@ -81,15 +81,44 @@ exports.update = async (req, res) => {
   res.json({ field });
 };
 
+async function removeScanImages(scans) {
+  await Promise.all(scans.filter((scan) => scan.imageUrl).map((scan) => fs.promises.unlink(path.join(UPLOAD_DIR, path.basename(scan.imageUrl))).catch((error) => {
+    if (error.code !== 'ENOENT') throw error;
+  })));
+}
+
+async function deleteFieldAnalysis(fieldId, scans) {
+  await removeScanImages(scans);
+  const scanIds = scans.map((scan) => scan._id);
+  const recommendationFilter = scanIds.length
+    ? { $or: [{ fieldId }, { scanId: { $in: scanIds } }] }
+    : { fieldId };
+  const [deletedRecommendations, deletedScans] = await Promise.all([
+    Recommendation.deleteMany(recommendationFilter),
+    Scan.deleteMany({ fieldId }),
+  ]);
+  return {
+    deletedScans: deletedScans.deletedCount,
+    deletedRecommendations: deletedRecommendations.deletedCount,
+  };
+}
+
 exports.remove = async (req, res) => {
   const field = await getOwnedField(req, res);
   if (!field) return;
   const scans = await Scan.find({ fieldId: field._id }, 'imageUrl');
-  await Promise.all(scans.filter((s) => s.imageUrl).map((s) => fs.promises.unlink(path.join(UPLOAD_DIR, path.basename(s.imageUrl))).catch(() => {})));
-  await Scan.deleteMany({ fieldId: field._id });
-  await Recommendation.deleteMany({ fieldId: field._id });
+  await deleteFieldAnalysis(field._id, scans);
   await field.deleteOne();
   res.json({ ok: true });
+};
+
+exports.resetAnalysis = async (req, res) => {
+  const field = await getOwnedField(req, res);
+  if (!field) return;
+  await Field.updateOne({ _id: field._id, ownerId: req.userId }, { $inc: { analysisVersion: 1 } });
+  const scans = await Scan.find({ fieldId: field._id }, 'imageUrl');
+  const deleted = await deleteFieldAnalysis(field._id, scans);
+  res.json({ ok: true, ...deleted });
 };
 
 async function mapFor(field) {

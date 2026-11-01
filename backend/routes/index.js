@@ -7,6 +7,7 @@ const contactC = require('../controllers/contactController');
 const adminC = require('../controllers/adminController');
 const admin = require('../middleware/admin');
 const fieldC = require('../controllers/fieldController');
+const nearbyC = require('../controllers/nearbyController');
 const scanC = require('../controllers/scanController');
 const droneC = require('../controllers/droneController');
 const chatC = require('../controllers/chatController');
@@ -45,12 +46,14 @@ router.get('/admin/messages', auth, admin, w(adminC.messages));
 router.patch('/admin/messages/:id/read', auth, admin, w(adminC.markMessageRead));
 
 router.get('/dashboard', auth, w(fieldC.dashboard));
+router.get('/nearby', auth, w(nearbyC.search));
 router.post('/chat', auth, chatRateLimit, w(chatC.ask));
 
 router.post('/fields', auth, w(fieldC.create));
 router.get('/fields', auth, w(fieldC.list));
 router.get('/fields/:id', auth, w(fieldC.get));
 router.patch('/fields/:id', auth, w(fieldC.update));
+router.delete('/fields/:id/analysis', auth, w(fieldC.resetAnalysis));
 router.delete('/fields/:id', auth, w(fieldC.remove));
 router.get('/fields/:id/scans', auth, w(fieldC.scans));
 router.get('/fields/:id/health-map', auth, w(fieldC.healthMap));

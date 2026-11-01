@@ -1,15 +1,13 @@
-const RADIUS_METERS = 80_000;
-const OVERPASS_ENDPOINTS = [
-  'https://overpass-api.de/api/interpreter',
-  'https://overpass.kumi.systems/api/interpreter',
-];
-const OVERPASS_REQUEST_TIMEOUT_MS = 15_000;
-const OVERPASS_QUERY_TIMEOUT_SECONDS = 12;
+import { api } from './api.js';
+
+const RADIUS_METERS = 50_000;
+const MAX_RESULTS = 10;
 const GEOCODER_TIMEOUT_MS = 6_000;
 const CACHE_TTL_MS = 5 * 60_000;
 const MAX_CACHE_ENTRIES = 20;
 const nearbyCache = new Map();
 const placeCache = new Map();
+
 const sharedNurseries = [{
   id: 'google-maps/kyari-nursery',
   name: 'Kyari',
@@ -17,6 +15,79 @@ const sharedNurseries = [{
   location: { latitude: 22.7640334, longitude: 75.8987217 },
   mapUrl: 'https://maps.app.goo.gl/CSkow7DoVnPmUY7J7',
 }];
+
+const demoLocations = [
+  {
+    id: 'demo/bhopal-1',
+    name: 'Hackathon Demo Agriculture Help Point 1 — Bhopal',
+    category: 'Agriculture office or company',
+    location: { latitude: 23.2151, longitude: 77.4001 },
+    address: 'Sample point near Kolar Road, Bhopal, Madhya Pradesh',
+  },
+  {
+    id: 'demo/bhopal-2',
+    name: 'Hackathon Demo Plant Nursery — Bhopal',
+    category: 'Plant nursery',
+    location: { latitude: 23.2861, longitude: 77.3982 },
+    address: 'Sample point near Arera Colony, Bhopal, Madhya Pradesh',
+  },
+  {
+    id: 'demo/bhopal-3',
+    name: 'Hackathon Demo Agriculture Supplier — Bhopal',
+    category: 'Agriculture supplier',
+    location: { latitude: 23.2668, longitude: 77.4670 },
+    address: 'Sample point near Govindpura, Bhopal, Madhya Pradesh',
+  },
+  {
+    id: 'demo/bhopal-4',
+    name: 'Hackathon Demo Farm Equipment — Bhopal',
+    category: 'Farm equipment',
+    location: { latitude: 23.2033, longitude: 77.3507 },
+    address: 'Sample point near Bairagarh, Bhopal, Madhya Pradesh',
+  },
+  {
+    id: 'demo/bhopal-5',
+    name: 'Hackathon Demo Agriculture Market — Bhopal',
+    category: 'Agriculture market or cooperative',
+    location: { latitude: 23.4271, longitude: 77.4948 },
+    address: 'Sample point near Bhopal, Madhya Pradesh',
+  },
+  {
+    id: 'demo/indore-1',
+    name: 'Hackathon Demo Agriculture Help Point 1 — Indore',
+    category: 'Agriculture office or company',
+    location: { latitude: 22.7196, longitude: 75.8577 },
+    address: 'Sample point in Indore, Madhya Pradesh',
+  },
+  {
+    id: 'demo/indore-2',
+    name: 'Hackathon Demo Plant Nursery — Indore',
+    category: 'Plant nursery',
+    location: { latitude: 22.7520, longitude: 75.8937 },
+    address: 'Sample point near Vijay Nagar, Indore, Madhya Pradesh',
+  },
+  {
+    id: 'demo/indore-3',
+    name: 'Hackathon Demo Agriculture Supplier — Indore',
+    category: 'Agriculture supplier',
+    location: { latitude: 22.6842, longitude: 75.8330 },
+    address: 'Sample point near Rajendra Nagar, Indore, Madhya Pradesh',
+  },
+  {
+    id: 'demo/indore-4',
+    name: 'Hackathon Demo Farm Equipment — Indore',
+    category: 'Farm equipment',
+    location: { latitude: 22.5676, longitude: 75.7570 },
+    address: 'Sample point near Mhow, Madhya Pradesh',
+  },
+  {
+    id: 'demo/indore-5',
+    name: 'Hackathon Demo Agriculture Market — Indore',
+    category: 'Agriculture market or cooperative',
+    location: { latitude: 22.9774, longitude: 75.8275 },
+    address: 'Sample point near Sanwer, Madhya Pradesh',
+  },
+];
 
 function distanceMeters(from, to) {
   const radians = (degrees) => (degrees * Math.PI) / 180;
@@ -48,9 +119,16 @@ function addressFrom(tags) {
 function classify(tags) {
   const name = tags.name || tags['name:en'] || '';
   if (tags.amenity === 'veterinary' || /veterinary|vet clinic/i.test(name)) return 'Veterinary service';
-  if (['garden_centre', 'plants'].includes(tags.shop) || tags.landuse === 'plant_nursery' || /nurser|नर्सरी/i.test(name)) return 'Plant nursery';
-  if (/mandi|agricultural market|farmers'? market|co-?operative|co-?op|कृषि मंडी|मंडी|सहकारी/i.test(name)) return 'Agriculture market or cooperative';
-  if (/tractor|farm machinery|agricultural machinery|farm equipment|कृषि यंत्र|ट्रैक्टर/i.test(name)) return 'Farm equipment';
+  if (['garden_centre', 'plants', 'plant_nursery'].includes(tags.shop)
+    || tags.landuse === 'plant_nursery'
+    || /nurser|नर्सरी/i.test(name)) return 'Plant nursery';
+  if (tags.marketplace === 'agricultural'
+    || /mandi|agricultural market|farmers'? market|co-?operative|co-?op|कृषि मंडी|मंडी|सहकारी/i.test(name)) {
+    return 'Agriculture market or cooperative';
+  }
+  if (/tractor|farm machinery|agricultural machinery|farm equipment|कृषि यंत्र|ट्रैक्टर/i.test(name)) {
+    return 'Farm equipment';
+  }
   if (['agrarian', 'seeds'].includes(tags.shop)
     || /seed|fertili[sz]er|pesticide|agrochemical|agri.?input|irrigation|agro.?dealer|बीज|खाद|कीटनाशक|उर्वरक/i.test(name)) {
     return 'Agriculture supplier';
@@ -60,16 +138,20 @@ function classify(tags) {
 }
 
 function normalizeElement(element, origin) {
-  const tags = element.tags || {};
+  if (!element || !element.tags) return null;
   const location = elementLocation(element);
   if (!location) return null;
+  const tags = element.tags;
   const category = classify(tags);
-  if (!tags.name && !['Plant nursery', 'Farm'].includes(category)) return null;
+  const name = tags.name || tags['name:en'];
+  if (!name && !['Plant nursery', 'Farm'].includes(category)) return null;
+
   const distance = distanceMeters(origin, location);
   if (distance > RADIUS_METERS) return null;
+
   return {
     id: `${element.type}/${element.id}`,
-    name: tags.name || tags['name:en'] || (category === 'Plant nursery' ? 'Unnamed plant nursery' : 'Unnamed farm'),
+    name: name || (category === 'Plant nursery' ? 'Unnamed plant nursery' : 'Unnamed farm'),
     category,
     distanceKm: distance / 1000,
     location,
@@ -92,55 +174,20 @@ function setCached(cache, key, value) {
   cache.set(key, { value, expiresAt: Date.now() + CACHE_TTL_MS });
 }
 
-async function fetchJsonWithTimeout(url, options, timeoutMs, timeoutMessage, unavailableMessage, networkMessage = '') {
+async function fetchJsonWithTimeout(url, timeoutMs) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const response = await fetch(url, { ...options, signal: controller.signal });
-    if (!response.ok) throw new Error(unavailableMessage);
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok) throw new Error('That location could not be searched. Please try again.');
     return await response.json();
   } catch (error) {
-    if (error.name === 'AbortError') throw new Error(timeoutMessage);
-    if (error.name === 'TypeError' && networkMessage) throw new Error(networkMessage);
+    if (error.name === 'AbortError') throw new Error('Location search is taking too long. Please try again.');
+    if (error.name === 'TypeError') throw new Error('Could not reach location search. Check your internet connection and retry.');
     throw error;
   } finally {
     clearTimeout(timeout);
   }
-}
-
-async function fetchOverpass(query) {
-  let lastError;
-  for (const endpoint of OVERPASS_ENDPOINTS) {
-    try {
-      const data = await fetchJsonWithTimeout(
-        endpoint,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
-          body: new URLSearchParams({ data: query }),
-        },
-        OVERPASS_REQUEST_TIMEOUT_MS,
-        'The map server is taking too long. Please try again.',
-        'The map server is busy. Trying another server.',
-      );
-      if (!Array.isArray(data.elements)) {
-        throw new Error('Nearby services returned an unexpected response. Please try again.');
-      }
-      return data;
-    } catch (error) {
-      lastError = error;
-    }
-  }
-  if (lastError?.message === 'The map server is taking too long. Please try again.') {
-    throw new Error('Nearby search took too long on both map servers. Please retry.');
-  }
-  if (lastError?.message === 'The map server is busy. Trying another server.') {
-    throw new Error('Both map servers are busy. Please retry in a moment.');
-  }
-  if (lastError?.name === 'TypeError') {
-    throw new Error('Could not reach OpenStreetMap. Check your internet connection and retry.');
-  }
-  throw lastError || new Error('Nearby services could not be loaded. Please try again.');
 }
 
 function formatPlaces(elements, origin) {
@@ -152,47 +199,47 @@ function formatPlaces(elements, origin) {
   sharedNurseries.forEach((nursery) => {
     const distance = distanceMeters(origin, nursery.location);
     if (distance <= RADIUS_METERS && !unique.has(nursery.id)) {
-      unique.set(nursery.id, {
-        ...nursery,
-        distanceKm: distance / 1000,
-        address: '',
-      });
+      unique.set(nursery.id, { ...nursery, distanceKm: distance / 1000, address: '' });
     }
   });
-  return [...unique.values()].sort((a, b) => a.distanceKm - b.distanceKm);
+  const nearbyDemoLocations = [];
+  demoLocations.forEach((location) => {
+    const distance = distanceMeters(origin, location.location);
+    if (distance <= RADIUS_METERS) {
+      nearbyDemoLocations.push({ ...location, distanceKm: distance / 1000, isDemo: true });
+    }
+  });
+  nearbyDemoLocations.sort((a, b) => a.distanceKm - b.distanceKm);
+  const nearbyOpenStreetMapPlaces = [...unique.values()]
+    .sort((a, b) => a.distanceKm - b.distanceKm)
+    .slice(0, MAX_RESULTS - nearbyDemoLocations.length);
+  return [...nearbyOpenStreetMapPlaces, ...nearbyDemoLocations]
+    .sort((a, b) => a.distanceKm - b.distanceKm);
 }
 
 export async function searchNearbyHelp(origin) {
-  const { latitude, longitude } = origin;
+  const { latitude, longitude } = origin || {};
   if (!Number.isFinite(latitude) || !Number.isFinite(longitude)
     || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
     throw new Error('Choose a valid location and try again.');
   }
 
-  const cacheKey = `v5-radius-${RADIUS_METERS}:${latitude.toFixed(5)},${longitude.toFixed(5)}`;
+  const cacheKey = `v7-radius-${RADIUS_METERS}:${latitude.toFixed(5)},${longitude.toFixed(5)}`;
   const cachedElements = getCached(nearbyCache, cacheKey);
   if (cachedElements) return formatPlaces(cachedElements, origin);
 
-  const query = `
-[out:json][timeout:${OVERPASS_QUERY_TIMEOUT_SECONDS}];
-(
-  nwr(around:${RADIUS_METERS},${latitude},${longitude})["office"~"agriculture|agricultural|agricultural_extension|agricultural_advisory",i];
-  nwr(around:${RADIUS_METERS},${latitude},${longitude})["government"~"agriculture|agricultural_extension|agricultural_advisory",i];
-  nwr(around:${RADIUS_METERS},${latitude},${longitude})["shop"~"agrarian|seeds|garden_centre|plants|farm",i];
-  nwr(around:${RADIUS_METERS},${latitude},${longitude})["landuse"="plant_nursery"];
-  nwr(around:${RADIUS_METERS},${latitude},${longitude})["landuse"="farmyard"];
-  nwr(around:${RADIUS_METERS},${latitude},${longitude})["place"="farm"];
-  nwr(around:${RADIUS_METERS},${latitude},${longitude})["name"~"agriculture|agricultural|agri|agro|nurser|garden cent(re|er)|plant nursery|nursar|seed|fertili[sz]er|pesticide|agrochemical|irrigation|tractor|farm machinery|farm equipment|mandi|agricultural market|co-?operative|krishi|kisan|कृषि|किसान|बीज|खाद|कीटनाशक|नर्सरी|मंडी|सहकारी|extension|kvk",i];
-  nwr(around:${RADIUS_METERS},${latitude},${longitude})["office"="company"]["name"~"agriculture|agricultural|agri|agro|seed|fertili[sz]er|pesticide|agrochemical|irrigation|tractor|nurser|machinery|equipment|mandi|co-?operative|krishi|kisan|कृषि|किसान|बीज|खाद|कीटनाशक|नर्सरी|मंडी|सहकारी|extension|kvk",i];
-  nwr(around:${RADIUS_METERS},${latitude},${longitude})["shop"]["name"~"agriculture|agricultural|agri|agro|seed|fertili[sz]er|pesticide|agrochemical|irrigation|tractor|nurser|machinery|equipment|mandi|co-?operative|krishi|kisan|कृषि|किसान|बीज|खाद|कीटनाशक|नर्सरी|मंडी|सहकारी|extension|kvk",i];
-  nwr(around:${RADIUS_METERS},${latitude},${longitude})["amenity"="veterinary"];
-);
-out center tags;`;
-
-  const data = await fetchOverpass(query);
-
-  setCached(nearbyCache, cacheKey, data.elements);
-  return formatPlaces(data.elements, origin);
+  let response;
+  try {
+    response = await api.nearby(latitude, longitude);
+  } catch (error) {
+    const fallbackPlaces = formatPlaces([], origin);
+    if (fallbackPlaces.length === 0) throw error;
+    throw Object.assign(new Error(error.message), { fallbackPlaces });
+  }
+  const { elements } = response;
+  if (!Array.isArray(elements)) throw new Error('Nearby search returned an invalid response. Please retry.');
+  setCached(nearbyCache, cacheKey, elements);
+  return formatPlaces(elements, origin);
 }
 
 export async function findPlace(query) {
@@ -205,11 +252,7 @@ export async function findPlace(query) {
   const params = new URLSearchParams({ q: trimmed, format: 'jsonv2', limit: '1' });
   const results = await fetchJsonWithTimeout(
     `https://nominatim.openstreetmap.org/search?${params}`,
-    {},
     GEOCODER_TIMEOUT_MS,
-    'Location search is taking too long. Please try again.',
-    'That location could not be searched. Please try again.',
-    'Could not reach location search. Check your internet connection and retry.',
   );
   const latitude = Number(results[0]?.lat);
   const longitude = Number(results[0]?.lon);

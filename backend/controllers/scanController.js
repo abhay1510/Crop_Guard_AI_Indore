@@ -20,6 +20,30 @@ function cropMismatch(fieldCrop, cls) {
   return !!predicted && !predicted.includes(norm(fieldCrop));
 }
 
+async function removeScanImage(filename) {
+  try {
+    await fs.promises.unlink(path.join(UPLOAD_DIR, path.basename(filename)));
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+  }
+}
+
+async function removeResetScan(scan) {
+  await Promise.all([
+    Recommendation.deleteMany({ scanId: scan._id }),
+    Scan.deleteOne({ _id: scan._id }),
+    removeScanImage(scan.imageUrl),
+  ]);
+}
+
+async function analysisWasReset(field, ownerId) {
+  return !await Field.exists({
+    _id: field._id,
+    ownerId,
+    analysisVersion: field.analysisVersion,
+  });
+}
+
 exports.create = async (req, res) => {
   const { fieldId, zoneId } = req.body || {};
   if (!mongoose.isValidObjectId(fieldId)) return res.status(400).json({ error: 'Valid fieldId is required' });
@@ -27,6 +51,10 @@ exports.create = async (req, res) => {
   if (!field) return res.status(404).json({ error: 'Field not found' });
   const zone = parseZoneId(zoneId, field.gridRows, field.gridColumns);
   if (!zone) return res.status(400).json({ error: `zoneId must be a valid grid cell (e.g. A1 to ${String.fromCharCode(64 + field.gridRows)}${field.gridColumns})` });
+  await Field.updateOne(
+    { _id: field._id, ownerId: req.userId, analysisVersion: { $exists: false } },
+    { $set: { analysisVersion: field.analysisVersion } },
+  );
 
   // Store under a random server-generated name; extension comes from detected content type.
   const filename = `${crypto.randomUUID()}.${req.file.detectedType}`;
@@ -34,34 +62,47 @@ exports.create = async (req, res) => {
 
   const scan = await Scan.create({
     fieldId: field._id, ownerId: req.userId, zoneId: zone.zoneId,
-    imageUrl: filename, status: 'processing',
+    imageUrl: filename, status: 'processing', analysisVersion: field.analysisVersion,
   });
 
+  const mime = req.file.detectedType === 'png' ? 'image/png' : 'image/jpeg';
+  let ai;
   try {
-    const mime = req.file.detectedType === 'png' ? 'image/png' : 'image/jpeg';
-    const ai = await aiClient.predict(req.file.buffer, filename, mime);
-    scan.prediction = ai.prediction;
-    scan.confidence = ai.confidence;
-    scan.certainty = ai.certainty;
-    scan.modelVersion = ai.model_version;
-    scan.cropMismatch = cropMismatch(field.cropType, ai.prediction);
-    scan.topPredictions = (ai.top_predictions || []).slice(0, 3).map((p) => ({ class: p.class, score: p.score }));
-    scan.status = 'completed';
-    await scan.save();
-
-    const rec = evaluateScan(scan);
-    await Recommendation.create({
-      fieldId: field._id, scanId: scan._id, zoneId: zone.zoneId, condition: rec.condition,
-      status: rec.status, severity: rec.severity, action: rec.action, requiresVerification: rec.requiresVerification,
-    });
-    return res.status(201).json({ scan, zoneStatus: rec.status, recommendation: rec });
+    ai = await aiClient.predict(req.file.buffer, filename, mime);
   } catch (e) {
-    // Do not present an unverified prediction: mark failed and keep the error for review.
+    if (await analysisWasReset(field, req.userId)) {
+      await removeResetScan(scan);
+      return res.status(409).json({ error: 'Field analysis was reset while this scan was processing. Please scan again if needed.' });
+    }
     scan.status = 'failed';
     scan.error = String(e.message).slice(0, 300);
     await scan.save();
     return res.status(502).json({ error: 'AI analysis failed', detail: scan.error, scan });
   }
+
+  if (await analysisWasReset(field, req.userId)) {
+    await removeResetScan(scan);
+    return res.status(409).json({ error: 'Field analysis was reset while this scan was processing. Please scan again if needed.' });
+  }
+  scan.prediction = ai.prediction;
+  scan.confidence = ai.confidence;
+  scan.certainty = ai.certainty;
+  scan.modelVersion = ai.model_version;
+  scan.cropMismatch = cropMismatch(field.cropType, ai.prediction);
+  scan.topPredictions = (ai.top_predictions || []).slice(0, 3).map((p) => ({ class: p.class, score: p.score }));
+  scan.status = 'completed';
+  await scan.save();
+
+  const rec = evaluateScan(scan);
+  await Recommendation.create({
+    fieldId: field._id, scanId: scan._id, zoneId: zone.zoneId, condition: rec.condition,
+    status: rec.status, severity: rec.severity, action: rec.action, requiresVerification: rec.requiresVerification,
+  });
+  if (await analysisWasReset(field, req.userId)) {
+    await removeResetScan(scan);
+    return res.status(409).json({ error: 'Field analysis was reset while this scan was processing. Please scan again if needed.' });
+  }
+  return res.status(201).json({ scan, zoneStatus: rec.status, recommendation: rec });
 };
 
 exports.list = async (req, res) => {

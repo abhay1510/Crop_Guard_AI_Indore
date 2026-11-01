@@ -32,7 +32,13 @@ export default function NearbyHelp() {
       setPlaces(results);
       setSearched(true);
     } catch (e) {
-      if (requestId.current === currentRequest) setError(e.message);
+      if (requestId.current === currentRequest) {
+        setError(e.message);
+        if (Array.isArray(e.fallbackPlaces)) {
+          setPlaces(e.fallbackPlaces);
+          setSearched(true);
+        }
+      }
     } finally {
       if (requestId.current === currentRequest) setBusy(false);
     }
@@ -87,7 +93,7 @@ export default function NearbyHelp() {
     <PageWrap>
       <SectionTitle icon={HandHelping} title={t('Nearby agricultural help')} />
       <p className="mb-5 max-w-3xl text-sm leading-6 text-emerald-100/65">
-        {t('Find agricultural offices, advisory centres, nurseries, suppliers, farm equipment, markets, cooperatives, farms and veterinary services within 80 km.')}
+        {t('Find agricultural offices, advisory centres, nurseries, suppliers, farm equipment, markets, cooperatives, farms and veterinary services within 50 km.')}
       </p>
 
       <section className="glass mb-6 p-5" aria-label={t('Choose a search location')}>
@@ -120,7 +126,7 @@ export default function NearbyHelp() {
 
       {busy && (
         <div className="py-8 text-center text-sm text-emerald-100/55" role="status">
-          <p>{t('Finding services within 80 km…')}</p>
+          <p>{t('Finding services within 50 km…')}</p>
         </div>
       )}
 
@@ -128,11 +134,11 @@ export default function NearbyHelp() {
         <section aria-live="polite">
           <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
             <h2 className="font-semibold">{t('Results near')} {place?.label}</h2>
-            <span className="text-xs text-emerald-100/45">{places.length} {t('places found within 80 km')}</span>
+            <span className="text-xs text-emerald-100/45">{places.length} {t('locations shown (maximum 10)')}</span>
           </div>
           {places.length === 0 ? (
             <div className="glass p-7 text-center text-sm text-emerald-100/55">
-              <p>{t('No matching services were found within 80 km. Some businesses may not be listed on OpenStreetMap.')}</p>
+              <p>{t('No matching services were found within 50 km. Some businesses may not be listed on OpenStreetMap.')}</p>
               {place && (
                 <a
                   className="btn-ghost mt-4"
@@ -140,7 +146,7 @@ export default function NearbyHelp() {
                   target="_blank"
                   rel="noreferrer"
                 >
-                  <ExternalLink size={15} />{t('Search plant nurseries on Google Maps (results may be outside 80 km)')}
+                  <ExternalLink size={15} />{t('Search plant nurseries on Google Maps (results may be outside 50 km)')}
                 </a>
               )}
             </div>
@@ -153,6 +159,7 @@ export default function NearbyHelp() {
                     <div className="min-w-0 flex-1">
                       <h3 className="font-semibold leading-snug">{t(item.name)}</h3>
                       <p className="mt-1 text-xs text-emerald-200/65">{t(item.category)} · {formatDistance(item.distanceKm)}</p>
+                      {item.isDemo && <p className="mt-1 text-xs font-medium text-amber-200">{t('Hackathon demo point · not a verified business')}</p>}
                     </div>
                   </div>
                   {item.address && <p className="mt-3 text-sm text-emerald-100/65">{item.address}</p>}
@@ -190,7 +197,7 @@ export default function NearbyHelp() {
       )}
 
       <p className="mt-6 text-xs leading-5 text-emerald-100/35">
-        {t('Locations are sourced from OpenStreetMap and farmer-shared Google Maps listings; some places may be missing or misplaced.')}
+        {t('Locations include OpenStreetMap results and farmer-shared listings; hackathon demo points are samples, not verified businesses.')}
         {' '}<a className="underline underline-offset-2 hover:text-emerald-100/65" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">© OpenStreetMap</a>
       </p>
     </PageWrap>

@@ -5,9 +5,15 @@ AI crop-health mapping for targeted inspection. Upload leaf photos, get a predic
 **Stack:** React + Vite + Tailwind + Framer Motion + Recharts · Node/Express + MongoDB · Python FastAPI + PyTorch (MobileNetV3) · Gemini farming chatbot
 
 ## Features
-Animated landing page and glass-style dashboard · auth with per-user access control · fields with configurable grid · small-block/leaf scanner with scan animation and confidence ring · drone image scanner with TIFF support, overlapping regions, Gemini visual assessments, and annotated health map · farming-only Gemini chatbot · animated health map with filters and zone details · prioritised recommendations with human-verification flags · scan history · printable field report (Save as PDF) · flagged-area estimate · optional simulated demo data (clearly labelled).
+Animated landing page and glass-style dashboard · auth with per-user access control · fields with configurable grid and analysis reset · small-block/leaf scanner with scan animation and confidence ring · drone image scanner with TIFF support, overlapping regions, Gemini visual assessments, and annotated health map · farming-only Gemini chatbot · animated health map with filters and zone details · prioritised recommendations with human-verification flags · scan history · printable field report (Save as PDF) · flagged-area estimate · optional simulated demo data (clearly labelled).
+
+On the **Fields** page, use **Reset** to permanently remove a field’s scans, results, recommendations, and uploaded scan images while keeping the field and its settings. In-progress scans are invalidated so their results cannot reappear after the reset. The app asks for confirmation before resetting.
+
+**Nearby agricultural help** sends location searches through the authenticated backend, which queries OpenStreetMap with multiple fallback servers and a short-lived cache. The frontend combines live OpenStreetMap results with 10 clearly marked, unverified hackathon sample points around Bhopal and Indore, then shows up to 10 closest places within 50 km. When sample points are nearby, results include those points and fill remaining slots with live map results. Sample points are not real business listings. If map servers are unavailable, nearby sample points remain visible alongside the error. Public map servers can rate-limit requests; retry after a short wait if they are busy. Coverage depends on map data; unlisted businesses will not appear. Restart the backend after updating the app so the `/api/nearby` route is available.
 
 The interface supports English, Hindi, and Marathi from the language selector in the header. English is the default; the selection is remembered in the browser. Chatbot replies and drone-analysis observations use the selected language.
+
+On first sign-in for each account in a browser, a step-by-step app tour explains the language selector and the main navigation options. Use **Next**/**Back** to move through the tour or **Skip** to close it; it will not appear again for that account in that browser.
 
 Not included: YOLO object detection, segmentation, GPS/NDVI, weather, robotics.
 
@@ -47,10 +53,33 @@ npm run dev                          # http://localhost:5173
 ```
 Or with Docker: `JWT_SECRET=$(openssl rand -hex 32) docker compose up --build`.
 
+## Share a local demo with ngrok (Windows)
+The Vite development server proxies `/api` to the local backend, so one ngrok tunnel shares both the UI and API. Keep the frontend API base as `/api` (the default in `frontend/.env.example`); do not set it to `localhost` or a local backend URL.
+
+1. Start MongoDB (locally or through your configured Atlas URI), then start the AI service and backend using steps 1–2 above. For a demo without model weights, set `$env:DEMO_MODE="true"` in the AI-service terminal before starting Uvicorn.
+2. In another PowerShell terminal:
+   ```powershell
+   cd frontend
+   npm run dev -- --host 0.0.0.0
+   ```
+3. Sign in to ngrok and configure its agent once with the auth token from your ngrok dashboard:
+   ```powershell
+   ngrok config add-authtoken <YOUR_NGROK_AUTHTOKEN>
+   ```
+   Keep the token private; do not put it in project files or share it.
+4. In a separate terminal, start the tunnel:
+   ```powershell
+   ngrok http 5173
+   ```
+5. Open the `https://...ngrok-free.app` forwarding URL printed by ngrok and share that URL with your friend. Keep all local services and the ngrok process running while they use it.
+
+The app and API will be reachable by anyone who has the tunnel URL. Use demo data and a non-admin test account, and stop ngrok (`Ctrl+C`) when finished. The free ngrok URL changes when you restart the tunnel. Browser geolocation requires the HTTPS forwarding URL and the visitor's permission.
+
 ## Admin and contact pages
 - Public **About us** and **Contact us** pages are linked from the landing page and app navigation.
-- Register the initial administrator account, then from `backend/` run `node scripts/setUserRole.js admin@gmail.com admin`. Replace the email with the account to promote. Only admins can manage account roles or read contact submissions.
-- Contact form messages are saved in MongoDB and shown in **Admin → Contact inbox**. To also send email notifications, configure `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, and `CONTACT_EMAIL` in `backend/.env`. Without SMTP configuration, messages remain available in the admin inbox and the contact page reports that email was not sent.
+- Admin accounts open only the Admin dashboard; farmer features and public About/Contact pages are not available while signed in as an admin. Admins can manage account roles and read contact submissions.
+- Register the initial administrator account, then from `backend/` run `node scripts/setUserRole.js admin@gmail.com admin`. Replace the email with the account to promote.
+- Contact form messages are saved in MongoDB and shown in **Admin → Contact inbox**. To email each submission, configure `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, optional `SMTP_FROM` (defaults to `SMTP_USER`), and `CONTACT_EMAIL` (the inbox that receives messages) in `backend/.env`. For Gmail, use `smtp.gmail.com`, port `587`, your Gmail address as `SMTP_USER`, and a Google app password as `SMTP_PASS` (enable 2-Step Verification and generate an app password in your Google Account; do not use your normal account password). Set `SMTP_FROM` to the authenticated Gmail address or leave it blank. Restart the backend after editing `.env`. Keep credentials private and never commit `.env`. Without SMTP configuration, submissions are still saved in the admin inbox; the contact page distinguishes unconfigured email from a delivery failure.
 
 ## Demo flow for judges (5 min)
 1. Landing page, register. 2. Fields: create a field. 3. Scanner: upload a leaf photo, show prediction, confidence and next step. 4. Health Map: the cell changes colour; click it. 5. Actions and Report pages. If you have no photos or model yet, use **Load simulated demo data** on the Fields page and say clearly it is simulated.

@@ -100,7 +100,7 @@ export default function Dashboard() {
               <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-emerald-400/15 text-emerald-300"><HandHelping size={21} /></span>
               <span className="min-w-0 flex-1">
                 <span className="block font-semibold">{t('Find agricultural help nearby')}</span>
-                <span className="mt-1 block text-sm text-emerald-100/55">{t('Find all agriculture-related places within 80 km.')}</span>
+                <span className="mt-1 block text-sm text-emerald-100/55">{t('Find all agriculture-related places within 50 km.')}</span>
               </span>
               <span className="flex items-center gap-2 text-sm font-medium text-emerald-300">{t('Nearby help')}<ArrowRight size={16} /></span>
             </Link>

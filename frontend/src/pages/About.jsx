@@ -14,7 +14,7 @@ export default function About() {
   return (
     <PageWrap>
       <SectionTitle icon={Leaf} title={t('About CropGuard AI')} />
-      <div className="glass mb-6 max-w-3xl p-6">
+      <div className="glass mb-6 w-full p-6">
         <p className="text-lg leading-8 text-emerald-50/85">
           {t('CropGuard AI helps farmers organise crop observations, screen leaf photos and find nearby agriculture-related places. It is designed to support timely inspection—not replace a farmer’s judgement or local agricultural expertise.')}
         </p>

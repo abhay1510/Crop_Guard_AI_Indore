@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Plus, ScanLine, Sprout, Trash2, Map as MapIcon } from 'lucide-react';
+import { Plus, RotateCcw, ScanLine, Sprout, Trash2, Map as MapIcon } from 'lucide-react';
 import { api } from '../services/api.js';
 import { PageWrap, SectionTitle, Skeleton, rise, stagger, useToast } from '../components/ui.jsx';
 import { ErrorBox, useFields } from '../components/common.jsx';
@@ -17,6 +17,7 @@ export default function Fields() {
   const [form, setForm] = useState({ name: '', cropType: 'tomato', areaAcres: 2, gridRows: 6, gridColumns: 8 });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [resettingField, setResettingField] = useState('');
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
 
   const create = async (e) => {
@@ -34,6 +35,20 @@ export default function Fields() {
   const remove = async (f) => {
     if (!window.confirm(`${t('Delete')} "${f.name}" ${t('and all of its scans? This cannot be undone.')}`)) return;
     try { await api.deleteField(f._id); await reload(); toast(t('Field deleted'), 'info'); } catch (err) { toast(t(err.message), 'error'); }
+  };
+
+  const resetAnalysis = async (f) => {
+    if (!window.confirm(`${t('Reset all analysis for')} "${f.name}"? ${t('This permanently deletes its scans, results, and recommendations. The field will remain.')}`)) return;
+    setResettingField(f._id);
+    try {
+      await api.resetFieldAnalysis(f._id);
+      await reload();
+      toast(t('Field analysis reset'), 'success');
+    } catch (err) {
+      toast(t(err.message), 'error');
+    } finally {
+      setResettingField('');
+    }
   };
 
   return (
@@ -74,6 +89,7 @@ export default function Fields() {
                     <div className="flex flex-wrap gap-2">
                       <button className="btn-ghost" onClick={() => { setSelected(f._id); nav('/scan'); }}><ScanLine size={15} />{t('Scan')}</button>
                       <button className="btn-ghost" onClick={() => { setSelected(f._id); nav('/map'); }}><MapIcon size={15} />{t('Map')}</button>
+                      <button className="btn-ghost !text-amber-300" onClick={() => resetAnalysis(f)} disabled={resettingField === f._id} title={t('Reset field analysis')}><RotateCcw size={15} />{t('Reset')}</button>
                       <button className="btn-ghost !text-rose-300" onClick={() => remove(f)} title={t('Delete')}><Trash2 size={15} /></button>
                     </div>
                   </div>

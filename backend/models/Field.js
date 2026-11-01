@@ -9,6 +9,7 @@ const fieldSchema = new mongoose.Schema(
     gridRows: { type: Number, required: true, min: 1, max: 26 },
     gridColumns: { type: Number, required: true, min: 1, max: 30 },
     boundary: { type: Object, default: null },
+    analysisVersion: { type: Number, default: 0 },
   },
   { timestamps: true }
 );

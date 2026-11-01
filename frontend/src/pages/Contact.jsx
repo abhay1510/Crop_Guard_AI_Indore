@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Mail } from 'lucide-react';
+import { Mail, Phone } from 'lucide-react';
 import { ErrorBox } from '../components/common.jsx';
 import { PageWrap, SectionTitle } from '../components/ui.jsx';
 import { useLanguage } from '../context/LanguageContext.jsx';
@@ -38,6 +38,26 @@ export default function Contact() {
       <p className="mb-6 text-sm leading-6 text-emerald-100/60">
         {t('Send the CropGuard team a question or feedback. Your message is saved securely for the team to review.')}
       </p>
+      <section className="glass mb-6 p-5" aria-labelledby="demo-contact-title">
+        <h2 id="demo-contact-title" className="font-semibold">{t('Demo contact details')}</h2>
+        <p className="mt-1 text-xs text-amber-200/80">{t('These are fictional placeholders for demonstration only. They are not monitored.')}</p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <div className="flex items-center gap-3 rounded-xl bg-white/5 p-4">
+            <Phone size={18} className="shrink-0 text-emerald-300" />
+            <div>
+              <p className="text-xs text-emerald-100/50">{t('Toll-free')}</p>
+              <p className="font-medium">1800-XXX-XXXX</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 rounded-xl bg-white/5 p-4">
+            <Mail size={18} className="shrink-0 text-emerald-300" />
+            <div>
+              <p className="text-xs text-emerald-100/50">{t('Email')}</p>
+              <p className="font-medium">support@example.invalid</p>
+            </div>
+          </div>
+        </div>
+      </section>
       <form className="glass space-y-4 p-5 sm:p-7" onSubmit={submit}>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
@@ -60,9 +80,14 @@ export default function Contact() {
         <ErrorBox error={error} />
         {result && (
           <div className={`rounded-xl border px-4 py-3 text-sm ${result.emailSent ? 'border-emerald-400/25 bg-emerald-400/10 text-emerald-200' : 'border-amber-400/25 bg-amber-400/10 text-amber-100'}`} role="status">
-            {result.emailSent
+            <p>{result.emailSent
               ? t('Your message was saved and an email notification was sent.')
-              : t('Your message was saved to the admin inbox. Email notification is not configured yet.')}
+              : t('Your message was saved to the admin inbox.')}</p>
+            {!result.emailSent && (
+              <p className="mt-1">{result.emailStatus === 'not_configured'
+                ? t('Email notifications are not configured yet.')
+                : t('Email could not be sent right now. Please try again later or contact the team another way.')}</p>
+            )}
           </div>
         )}
         <button className="btn" type="submit" disabled={busy}>{busy ? t('Sending…') : t('Send message')}</button>

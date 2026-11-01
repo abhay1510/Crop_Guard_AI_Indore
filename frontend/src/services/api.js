@@ -1,4 +1,4 @@
-const BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+const BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 
 export const getToken = () => localStorage.getItem('cg_token');
 export const setToken = (t) => (t ? localStorage.setItem('cg_token', t) : localStorage.removeItem('cg_token'));
@@ -51,8 +51,10 @@ export const api = {
   markAdminMessageRead: (id) => request(`/admin/messages/${id}/read`, { method: 'PATCH' }),
   health: () => request('/health'),
   dashboard: () => request('/dashboard'),
+  nearby: (latitude, longitude) => request(`/nearby?lat=${encodeURIComponent(latitude)}&lon=${encodeURIComponent(longitude)}`, { timeoutMs: 32_000 }),
   fields: () => request('/fields'),
   createField: (b) => request('/fields', { method: 'POST', body: b }),
+  resetFieldAnalysis: (id) => request(`/fields/${id}/analysis`, { method: 'DELETE' }),
   deleteField: (id) => request(`/fields/${id}`, { method: 'DELETE' }),
   report: (id) => request(`/fields/${id}/report`),
   healthMap: (id) => request(`/fields/${id}/health-map`),
