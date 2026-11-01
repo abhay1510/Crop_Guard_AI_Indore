@@ -1,0 +1,31 @@
+# One-command run:  JWT_SECRET=$(openssl rand -hex 32) docker compose up --build
+# Needs ai-service/models/{crop_model.pth,class_labels.json,model_meta.json} (see README "Train the real model").
+# Frontend: http://localhost:5173   Backend: http://localhost:5000/api/health   AI: http://localhost:8000/health
+services:
+  mongo:
+    image: mongo:7
+    volumes: [mongo-data:/data/db]
+  ai-service:
+    build: ./ai-service
+    volumes: ["./ai-service/models:/app/models:ro"]
+    ports: ["8000:8000"]
+  backend:
+    build: ./backend
+    environment:
+      MONGODB_URI: mongodb://mongo:27017/cropguard
+      AI_SERVICE_URL: http://ai-service:8000
+      JWT_SECRET: "${JWT_SECRET:?set JWT_SECRET}"
+      CORS_ORIGIN: http://localhost:5173
+    volumes: [uploads:/app/uploads]
+    ports: ["5000:5000"]
+    depends_on: [mongo, ai-service]
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: http://localhost:5000/api
+    ports: ["5173:80"]
+    depends_on: [backend]
+volumes:
+  mongo-data:
+  uploads:

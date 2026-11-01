@@ -1,0 +1,21 @@
+{
+  "arch": "mobilenet_v3_large",
+  "img_size": 224,
+  "version": "2026.10.31",
+  "temperature": 0.3996,
+  "thresholds": {
+    "high": 0.85,
+    "low": 0.6
+  },
+  "metrics": {
+    "test_accuracy": 0.9971,
+    "test_macro_f1": 0.9976,
+    "ece": 0.0024,
+    "n_test": 3087
+  },
+  "trained_on": {
+    "classes": 15,
+    "train_images": 14450,
+    "data_dir": "data"
+  }
+}

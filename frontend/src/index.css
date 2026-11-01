@@ -1,0 +1,24 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html { scroll-behavior: smooth; }
+body { @apply bg-[#06140d] text-emerald-50 font-sans antialiased; }
+::selection { background: rgba(52, 211, 153, 0.35); }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 8px; }
+
+@layer components {
+  .glass { @apply bg-white/[0.045] backdrop-blur-xl border border-white/10 rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.25)]; }
+  .glass-hover { @apply transition duration-300 hover:bg-white/[0.07] hover:border-emerald-400/30 hover:-translate-y-0.5; }
+  .btn { @apply relative inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-lime-500 px-5 py-2.5 text-sm font-semibold text-emerald-950 shadow-lg shadow-emerald-500/20 transition hover:shadow-emerald-400/40 hover:brightness-110 active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100; }
+  .btn-ghost { @apply inline-flex items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-emerald-50 transition hover:bg-white/10 active:scale-[0.97]; }
+  .input { @apply w-full rounded-xl border border-white/10 bg-black/25 px-3.5 py-2.5 text-sm text-emerald-50 placeholder-emerald-100/30 transition focus:outline-none focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-400/20; }
+  .input option { @apply bg-[#0b2016] text-emerald-50; }
+  .label { @apply mb-1.5 block text-xs font-medium uppercase tracking-wider text-emerald-100/50; }
+  .gradient-text { @apply bg-gradient-to-r from-emerald-300 via-lime-300 to-emerald-300 bg-[length:200%_auto] bg-clip-text text-transparent animate-gradient-shift; }
+}
+
+@media print {
+  body { background: #fff !important; }
+}
