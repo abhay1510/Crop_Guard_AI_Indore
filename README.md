@@ -74,15 +74,11 @@ The Vite development server proxies `/api` to the local backend, so one ngrok tu
 5. Open the `https://...ngrok-free.app` forwarding URL printed by ngrok and share that URL with your friend. Keep all local services and the ngrok process running while they use it.
 
 The app and API will be reachable by anyone who has the tunnel URL. Use demo data and a non-admin test account, and stop ngrok (`Ctrl+C`) when finished. The free ngrok URL changes when you restart the tunnel. Browser geolocation requires the HTTPS forwarding URL and the visitor's permission.
-
 ## Admin and contact pages
 - Public **About us** and **Contact us** pages are linked from the landing page and app navigation.
 - Admin accounts open only the Admin dashboard; farmer features and public About/Contact pages are not available while signed in as an admin. Admins can manage account roles and read contact submissions.
 - Register the initial administrator account, then from `backend/` run `node scripts/setUserRole.js admin@gmail.com admin`. Replace the email with the account to promote.
 - Contact form messages are saved in MongoDB and shown in **Admin → Contact inbox**. To email each submission, configure `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, optional `SMTP_FROM` (defaults to `SMTP_USER`), and `CONTACT_EMAIL` (the inbox that receives messages) in `backend/.env`. For Gmail, use `smtp.gmail.com`, port `587`, your Gmail address as `SMTP_USER`, and a Google app password as `SMTP_PASS` (enable 2-Step Verification and generate an app password in your Google Account; do not use your normal account password). Set `SMTP_FROM` to the authenticated Gmail address or leave it blank. Restart the backend after editing `.env`. Keep credentials private and never commit `.env`. Without SMTP configuration, submissions are still saved in the admin inbox; the contact page distinguishes unconfigured email from a delivery failure.
-
-## Demo flow for judges (5 min)
-1. Landing page, register. 2. Fields: create a field. 3. Scanner: upload a leaf photo, show prediction, confidence and next step. 4. Health Map: the cell changes colour; click it. 5. Actions and Report pages. If you have no photos or model yet, use **Load simulated demo data** on the Fields page and say clearly it is simulated.
 
 ## Real model vs demo mode (important)
 - **Real mode:** put `crop_model.pth` and `class_labels.json` in `ai-service/models/` (train with `python training/train.py --data data --epochs 8`; dataset layout is in the script header). Class names containing "healthy" count as healthy.
@@ -91,9 +87,6 @@ The app and API will be reachable by anyone who has the tunnel URL. Use demo dat
 - Confidence thresholds (`HIGH_CONF=0.85`, `LOW_CONF=0.60`) are unvalidated starting values. Calibrate on your validation set. PlantVillage-style lab images usually overstate field performance.
 
 The app flags where to inspect. It does not diagnose and never recommends pesticides, fertiliser or doses. Verify on-site first.
-
-## Production notes
-Set `CORS_ORIGIN`, a strong `JWT_SECRET`, serve over HTTPS, and use object storage for uploads on hosts with ephemeral disks.
 
 ## Farming chatbot
 - Sign in and open **Farm assistant**. The authenticated backend proxies questions to Google Gemini `generateContent`; configure `GEMINI_API_KEY` in `backend/.env` (optional `GEMINI_MODEL`, default `gemini-3.5-flash-lite`). Create a key in [Google AI Studio](https://aistudio.google.com/apikey). Never expose the key in frontend code or commit it.
